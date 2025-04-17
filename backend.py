@@ -3,6 +3,7 @@ import os
 import requests
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 # Import service functions
 from services import (
@@ -27,6 +28,24 @@ if not REPLICATE_API_TOKEN:
 # Initialize FastAPI App
 app = FastAPI()
 
+# --- CORS Middleware ---
+# Allow requests from your frontend development server
+# In production, restrict origins more specifically
+origins = [
+    "http://localhost:3000", # Default Next.js dev port
+    "http://127.0.0.1:3000",
+    # Add any other origins if needed (e.g., your deployed frontend URL)
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"], # Allows all methods (GET, POST, etc.)
+    allow_headers=["*"], # Allows all headers
+)
+
+
 # --- Helper Functions (Keep only those specific to backend.py) ---
 # Remove encode_image_to_base64 (moved to services.py)
 # Keep stream_audio_from_url IF it wasn't moved to services.py, otherwise remove.
@@ -44,7 +63,8 @@ async def describe_image_musically_endpoint(image: UploadFile = File(...)):
     try:
         # Call the service function
         description = await get_musical_description_from_openai(image)
-        return {"musical_description": description}
+        # Return description with key "description"
+        return {"description": description}
     except HTTPException as e:
         # Re-raise HTTPExceptions raised by the service
         raise e
@@ -57,13 +77,13 @@ async def describe_image_musically_endpoint(image: UploadFile = File(...)):
 async def generate_audio_endpoint(prompt: str = Form(...)):
     """
     Endpoint to generate audio from a text prompt.
-    Delegates generation to the services module and streams the result.
+    Delegates generation to the services module and returns the audio URL.
     """
     try:
         # Call the service function to get the audio URL
         audio_url = await generate_audio_from_replicate(prompt)
-
-        return audio_url
+        # Return the URL with key "audio_url"
+        return {"audio_url": audio_url}
 
     except HTTPException as e:
         # Re-raise HTTPExceptions raised by the service
@@ -71,7 +91,7 @@ async def generate_audio_endpoint(prompt: str = Form(...)):
     except Exception as e:
         # Catch unexpected errors during endpoint handling
         print(f"Unexpected error in /generate-audio endpoint: {e}")
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred while generating/streaming audio: {e}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred while generating audio: {e}")
 
 
 # --- Run the App (for local development) ---
@@ -80,7 +100,7 @@ if __name__ == "__main__":
     import uvicorn
     print("Starting Uvicorn server...")
     print("Remember to set OPENAI_API_KEY and REPLICATE_API_TOKEN environment variables.")
-    print("Run with: uvicorn backend:app --reload --host 0.0.0.0 --port 8000")
+    print("Run with: uvicorn backend.backend:app --reload --host 0.0.0.0 --port 8000")
     # Note: Running uvicorn programmatically like this is mainly for convenience.
     # In production, you'd typically use the uvicorn command directly.
     # uvicorn.run(app, host="0.0.0.0", port=8000) # This line won't work well with --reload

@@ -50,7 +50,7 @@ async def get_musical_description_from_openai(image: UploadFile):
                 "content": [
                     {
                     "type": "text",
-                    "text": "I want you to be an intermediary to a music generative model. So, you will take an image and create a description based on the image to create a musical query to send to a gen music model. I want you to account for the vibe, genre, colors, and feeling of the picture. Describe the image from a musical perspective. What kind of music or sound does it evoke? Think about mood, rhythm, instrumentation, genre, etc. Max 2 sentences. Return the description in a json with the key \"text\". "
+                    "text": "I want you to be an intermediary to a music generative model. So, you will take an image and create a description based on the image to create a musical query to send to a gen music model. I want you to account for the vibe, genre, colors, and feeling of the picture. Describe the image from a musical perspective. What kind of music or sound does it evoke? Think about mood, rhythm, instrumentation, genre, etc. Max 2 sentences. Return only the description, no other text."
                     },
                 ]
                 },
@@ -67,7 +67,7 @@ async def get_musical_description_from_openai(image: UploadFile):
                 }
             ],
             response_format={
-                "type": "json_object"
+                "type": "text"
             },
             reasoning_effort="low",
             store=False
@@ -111,14 +111,24 @@ async def generate_audio_from_replicate(prompt: str) -> str:
                 "classifier_free_guidance": 3
             }
         )
-        print(f"Replicate output: {output}")
+        print(f"Replicate output: {output, type(output)}")
 
+        # --- Handling Replicate Output ---
+        audio_url = None
+        # Check if the output is the expected FileOutput object
+        if hasattr(output, 'url') and isinstance(getattr(output, 'url', None), str):
+            audio_url = output.url
+        # Fallback: Check if it's already a string URL (less likely now, but safe)
+        elif isinstance(output, str) and output.startswith("http"):
+            audio_url = output
+        # Add checks for other potential formats if needed
 
-        if not output:
-            print(f"Unexpected output format from Replicate: {output}")
-            raise HTTPException(status_code=500, detail="Unexpected output format from audio generation model.")
+        if not audio_url:
+            print(f"Unexpected or missing audio URL in Replicate output: {output}")
+            # Be more specific about the error
+            raise HTTPException(status_code=500, detail="Audio generation succeeded but failed to get a valid audio URL from the output.")
 
-        return output
+        return audio_url # Return only the extracted URL string
 
     except replicate.exceptions.ReplicateError as e:
          print(f"Replicate API error: {e}")
