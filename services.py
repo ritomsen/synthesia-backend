@@ -4,7 +4,9 @@ import base64
 from openai import OpenAI
 from fastapi import HTTPException, UploadFile
 import requests
+from dotenv import load_dotenv
 
+load_dotenv()
 # --- Configuration ---
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
@@ -40,25 +42,36 @@ async def get_musical_description_from_openai(image: UploadFile):
     try:
         image_bytes = await image.read()
         base64_image = encode_image_to_base64(image_bytes)
-
         response = openai_client.chat.completions.create(
-            model="gpt-4-vision-preview", # Or the latest vision-capable model
+            model="o4-mini",
             messages=[
+                {
+                "role": "developer",
+                "content": [
+                    {
+                    "type": "text",
+                    "text": "I want you to be an intermediary to a music generative model. So, you will take an image and create a description based on the image to create a musical query to send to a gen music model. I want you to account for the vibe, genre, colors, and feeling of the picture. Describe the image from a musical perspective. What kind of music or sound does it evoke? Think about mood, rhythm, instrumentation, genre, etc. Max 2 sentences. Return the description in a json with the key \"text\". "
+                    },
+                ]
+                },
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "Describe this image from a musical perspective. What kind of music or sound does it evoke? Think about mood, rhythm, instrumentation, genre, etc."},
                         {
                             "type": "image_url",
                             "image_url": {
                                 "url": f"data:{image.content_type};base64,{base64_image}"
                             }
-                        },
-                    ],
+                        }
+                    ]
                 }
             ],
-            max_tokens=300 # Adjust as needed
-        )
+            response_format={
+                "type": "json_object"
+            },
+            reasoning_effort="low",
+            store=False
+            )
         description = response.choices[0].message.content
         if not description:
              raise HTTPException(status_code=500, detail="OpenAI returned an empty description.")
