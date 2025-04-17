@@ -8,7 +8,6 @@ from fastapi.responses import StreamingResponse
 from services import (
     get_musical_description_from_openai,
     generate_audio_from_replicate,
-    stream_audio_from_url # Keep this import if stream_audio_from_url remains here, or remove if moved
 )
 
 # --- Configuration --- (Keep API key loading for potential direct use or config checks)
@@ -64,9 +63,7 @@ async def generate_audio_endpoint(prompt: str = Form(...)):
         # Call the service function to get the audio URL
         audio_url = await generate_audio_from_replicate(prompt)
 
-        # Stream the audio from the URL using the service function
-        # Ensure stream_audio_from_url is imported from services
-        return StreamingResponse(stream_audio_from_url(audio_url), media_type="audio/wav") # Adjust media_type if needed
+        return audio_url
 
     except HTTPException as e:
         # Re-raise HTTPExceptions raised by the service

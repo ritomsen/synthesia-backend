@@ -89,30 +89,36 @@ async def generate_audio_from_replicate(prompt: str) -> str:
          raise HTTPException(status_code=500, detail="Replicate API token not configured.")
 
     # Replace with the specific model you want to use
-    model_identifier = "riffusion/riffusion:8cf61ea6c56afd61d8f5b9ffd14d7c216c0a93844ce2d82ac1c9ecc9c7f24e05"
+    model_identifier = "meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb"
     # This specific model might need more structured input, adjust accordingly
-    input_data = {"prompt_a": prompt} # Adjust based on the chosen model's API
 
     try:
-        print(f"Running Replicate model {model_identifier} with input: {input_data}")
+        print(f"Running Replicate model {model_identifier} with input: {prompt}")
         output = replicate.run(
-            model_identifier,
-            input=input_data
+            "meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb",
+            input={
+                "top_k": 150,
+                "top_p": 0,
+                "prompt": prompt,
+                "duration": 8,
+                "temperature": 1,
+                "continuation": False,
+                "model_version": "stereo-melody-large",
+                "output_format": "wav",
+                "continuation_start": 0,
+                "multi_band_diffusion": False,
+                "normalization_strategy": "loudness",
+                "classifier_free_guidance": 3
+            }
         )
         print(f"Replicate output: {output}")
 
-        # --- Handling Replicate Output ---
-        audio_url = None
-        if isinstance(output, dict) and "audio" in output and output["audio"]:
-            audio_url = output["audio"]
-        elif isinstance(output, str) and output.startswith("http"):
-             audio_url = output
 
-        if not audio_url:
+        if not output:
             print(f"Unexpected output format from Replicate: {output}")
             raise HTTPException(status_code=500, detail="Unexpected output format from audio generation model.")
 
-        return audio_url
+        return output
 
     except replicate.exceptions.ReplicateError as e:
          print(f"Replicate API error: {e}")
@@ -121,24 +127,3 @@ async def generate_audio_from_replicate(prompt: str) -> str:
         print(f"Error during Replicate audio generation: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to generate audio via Replicate: {e}")
 
-async def stream_audio_from_url(audio_url: str):
-    """Downloads and streams audio content from a URL."""
-    try:
-        # Use a context manager for the request
-        with requests.get(audio_url, stream=True) as r:
-            r.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
-            # Stream content in chunks
-            for chunk in r.iter_content(chunk_size=8192):
-                if chunk: # Filter out keep-alive new chunks
-                    yield chunk
-    except requests.exceptions.RequestException as e:
-        print(f"Error streaming audio from {audio_url}: {e}")
-        # Propagate the error or handle it gracefully
-        # Option 1: Raise an exception that FastAPI can handle
-        # raise HTTPException(status_code=502, detail=f"Failed to stream audio from source: {e}")
-        # Option 2: Yield an empty byte string or a specific error message if the client expects it
-        yield b"" # Yield empty bytes on error to keep the streaming response structure
-    except Exception as e:
-        # Catch any other unexpected errors during streaming
-        print(f"Unexpected error streaming audio: {e}")
-        yield b""
