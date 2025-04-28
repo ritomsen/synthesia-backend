@@ -6,31 +6,26 @@ from fastapi import HTTPException, UploadFile
 import requests
 from dotenv import load_dotenv
 
-load_dotenv()
-# --- Configuration ---
+load_dotenv() # Load env variables
+
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
 
-# --- Initialize Clients ---
 try:
     openai_client = OpenAI()
     if not OPENAI_API_KEY:
         print("Warning: OPENAI_API_KEY environment variable not set.")
-        # You might want more robust handling here depending on requirements
 except Exception as e:
     print(f"Failed to initialize OpenAI client: {e}")
     openai_client = None
 
 if not REPLICATE_API_TOKEN:
     print("Warning: REPLICATE_API_TOKEN environment variable not set.")
-    # You might want more robust handling here
 
-# --- Helper Functions ---
 def encode_image_to_base64(image_bytes: bytes) -> str:
     """Encodes image bytes to a base64 string."""
     return base64.b64encode(image_bytes).decode('utf-8')
 
-# --- Service Functions ---
 
 async def get_musical_description_from_openai(image: UploadFile):
     """Sends image to OpenAI and returns a musical description."""
@@ -79,7 +74,6 @@ async def get_musical_description_from_openai(image: UploadFile):
 
     except Exception as e:
         print(f"Error processing image with OpenAI: {e}")
-        # Consider more specific exception handling
         raise HTTPException(status_code=500, detail=f"Failed to get musical description from OpenAI: {e}")
 
 
@@ -88,14 +82,12 @@ async def generate_audio_from_replicate(prompt: str) -> str:
     if not REPLICATE_API_TOKEN:
          raise HTTPException(status_code=500, detail="Replicate API token not configured.")
 
-    # Replace with the specific model you want to use
     model_identifier = "meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb"
-    # This specific model might need more structured input, adjust accordingly
 
     try:
         print(f"Running Replicate model {model_identifier} with input: {prompt}")
         output = replicate.run(
-            "meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb",
+            model_identifier,
             input={
                 "top_k": 150,
                 "top_p": 0,
@@ -103,7 +95,7 @@ async def generate_audio_from_replicate(prompt: str) -> str:
                 "duration": 8,
                 "temperature": 1,
                 "continuation": False,
-                "model_version": "stereo-melody-large",
+                "model_version": "stereo-large",
                 "output_format": "wav",
                 "continuation_start": 0,
                 "multi_band_diffusion": False,
@@ -113,16 +105,13 @@ async def generate_audio_from_replicate(prompt: str) -> str:
         )
         print(f"Replicate output: {output, type(output)}")
 
-        # --- Handling Replicate Output ---
+
+        # Make sure output is a str url
         audio_url = None
-        # Check if the output is the expected FileOutput object
         if hasattr(output, 'url') and isinstance(getattr(output, 'url', None), str):
             audio_url = output.url
-        # Fallback: Check if it's already a string URL (less likely now, but safe)
         elif isinstance(output, str) and output.startswith("http"):
             audio_url = output
-        # Add checks for other potential formats if needed
-
         if not audio_url:
             print(f"Unexpected or missing audio URL in Replicate output: {output}")
             # Be more specific about the error
